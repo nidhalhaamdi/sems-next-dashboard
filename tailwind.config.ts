@@ -8,11 +8,17 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        montserrat: ['Montserrat', 'sans-serif'],
+      },
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        primary: '#001311',
+        secondary: '#002722',
+        accent: '#0F574D',
+        highlight: '#256F65',
       },
     },
   },
   plugins: [],
 } satisfies Config;
+
