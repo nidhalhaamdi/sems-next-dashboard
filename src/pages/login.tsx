@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import Footer from '../components/Footer';
-//import DeviceHive from 'devicehive';
+import { loginUser } from '../api/auth';
 
 const Login = () => {
   const [login, setLogin] = useState('');
@@ -11,40 +11,14 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (login === 'admin' && password === 'admin') {
-      localStorage.setItem('token', 'mock-token');
+    try {
+      const { refreshToken } = await loginUser(login, password);
+      sessionStorage.setItem('refreshToken', refreshToken);
       router.push('/admin');
-    } else {
-      alert('Invalid credentials');
+    } catch (error: any) {
+      alert(error.message || 'Login failed');
     }
   };
-
-  // const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-  //   e.preventDefault();
-  
-  //   try {
-  //     // Initialize DeviceHive with the provided credentials
-  //     const deviceHive = new DeviceHive({
-  //       login,
-  //       password,
-  //       mainServiceURL: process.env.NEXT_PUBLIC_DEVICEHIVE_MAIN_SERVICE_URL,
-  //       authServiceURL: process.env.NEXT_PUBLIC_DEVICEHIVE_AUTH_SERVICE_URL,
-  //       pluginServiceURL: process.env.NEXT_PUBLIC_DEVICEHIVE_PLUGIN_SERVICE_URL,
-  //     });
-  
-  //     // Connect to DeviceHive
-  //     await deviceHive.connect();
-  
-  //     // Store the DeviceHive instance in localStorage (or state management)
-  //     localStorage.setItem('deviceHive', JSON.stringify(deviceHive));
-  
-  //     // Redirect to the admin dashboard
-  //     router.push('/admin');
-  //   } catch (error) {
-  //     console.error('Login failed:', error);
-  //     alert('Invalid credentials or connection error');
-  //   }
-  // };
 
   return (
     <div className="flex flex-col min-h-screen bg-cover" style={{ backgroundImage: "url('/background.jpg')" }}>
@@ -64,6 +38,7 @@ const Login = () => {
               onChange={(e) => setLogin(e.target.value)}
               placeholder="Username"
               className="w-full p-3 border border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
+              required
             />
             <input
               type="password"
@@ -71,6 +46,7 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               className="w-full p-3 border border-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-highlight"
+              required
             />
             <button
               type="submit"

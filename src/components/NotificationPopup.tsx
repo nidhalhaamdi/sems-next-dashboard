@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { refreshAccessToken } from '@/api/auth';
+import { createNotification } from '@/api/notifications';
 
 interface NotificationPopupProps {
   isOpen: boolean;
   onClose: () => void;
+  deviceId: string;
 }
 
-const NotificationPopup: React.FC<NotificationPopupProps> = ({ isOpen, onClose }) => {
+const NotificationPopup: React.FC<NotificationPopupProps> = ({ isOpen, onClose, deviceId }) => {
   const [name, setName] = useState('');
   const [parameters, setParameters] = useState('');
 
@@ -31,10 +34,39 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ isOpen, onClose }
     onClose();
   };
 
-  const handleSave = () => {
-    // Add functionality to save the data
-    console.log('Notification saved');
-    onClose();
+  const handleSave = async () => {
+    if (!deviceId) {
+      alert('Device ID is missing!');
+      return;
+    }
+
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken) return;
+
+    let parsedParams = {};
+    if (parameters.trim()) {
+      try {
+        parsedParams = JSON.parse(parameters);
+      } catch (err) {
+        alert('Invalid JSON in Parameters field');
+        return;
+      }
+    }
+
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      await createNotification(deviceId, accessToken, {
+        notification: name,
+        timestamp: new Date().toISOString(),
+        parameters: parsedParams,
+      });
+
+      alert('Notification sent successfully!');
+      onClose();
+    } catch (err: any) {
+      console.error('Failed to send notification:', err);
+      alert(`Failed to send notification: ${err.message}`);
+    }
   };
 
   if (!isOpen) return null;
@@ -59,7 +91,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ isOpen, onClose }
             value={parameters}
             onChange={(e) => setParameters(e.target.value)}
             className="p-2 border border-gray-300 rounded w-full"
-            placeholder="Enter parameters"
+            placeholder='e.g. { "value": 22 }'
           />
         </div>
         <div className="flex justify-end">

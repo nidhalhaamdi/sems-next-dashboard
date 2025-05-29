@@ -1,13 +1,49 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { users } from '@/data/placeholderData';
 import AdminLayout from '@/components/AdminLayout';
+import { getAllUsers, deleteUserById } from '@/api/users';
+import { refreshAccessToken } from '@/api/auth';
 
 const Users = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [users, setUsers] = useState([]);
   const router = useRouter();
 
-  const filteredUsers = users.filter((user) =>
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const refreshToken = sessionStorage.getItem('refreshToken');
+      if (!refreshToken) return;
+
+      try {
+        const accessToken = await refreshAccessToken(refreshToken);
+        const userList = await getAllUsers(accessToken);
+        setUsers(userList);
+      } catch (error) {
+        console.error('Error loading users:', error);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const handleDelete = async (id: number) => {
+    const confirmDelete = confirm('Are you sure you want to delete this user?');
+    if (!confirmDelete) return;
+
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken) return;
+
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      await deleteUserById(id, accessToken);
+      setUsers((prev) => prev.filter((user) => user.id !== id));
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert('Failed to delete user.');
+    }
+  };
+
+  const filteredUsers = users.filter((user: any) =>
     user.login.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -52,15 +88,15 @@ const Users = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((user) => (
+            {filteredUsers.map((user: any) => (
               <tr key={user.id}>
                 <td className="py-2 px-4 border-b font-medium text-center">{user.login}</td>
                 <td className="py-2 px-4 border-b text-center">{user.role === 0 ? 'Administrator' : 'Client'}</td>
                 <td className="py-2 px-4 border-b text-center">
                   {user.status === 0 ? 'Active' : user.status === 1 ? 'Locked' : 'Disabled'}
                 </td>
-                <td className="py-2 px-4 border-b text-center">{user.lastLogin}</td>
-                <td className="py-2 px-4 border-b text-center">{JSON.stringify(user.data)}</td>
+                <td className="py-2 px-4 border-b text-center">{user.lastLogin || '—'}</td>
+                <td className="py-2 px-4 border-b text-center">{user.data ? JSON.stringify(user.data) : '—'}</td>
                 <td className="py-2 px-4 border-b text-center">
                   <button
                     className="px-2 py-1 bg-blue-500 text-white rounded mr-2 hover:bg-blue-700"
@@ -68,7 +104,12 @@ const Users = () => {
                   >
                     Details
                   </button>
-                  <button className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-700">Delete</button>
+                  <button
+                    className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-700"
+                    onClick={() => handleDelete(user.id)}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

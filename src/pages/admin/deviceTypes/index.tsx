@@ -1,23 +1,62 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { deviceTypes } from '@/data/placeholderData';
 import AdminLayout from '@/components/AdminLayout';
+import { refreshAccessToken } from '@/api/auth';
+import { deleteDeviceTypeById, getAllDeviceTypes } from '@/api/deviceTypes';
+
+type DeviceType = {
+  id: number;
+  name: string;
+  description: string;
+};
 
 const DeviceTypes = () => {
+  const [deviceTypes, setDeviceTypes] = useState<DeviceType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
 
-  const filteredDeviceTypes = deviceTypes.filter((deviceType) =>
-    deviceType.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchData = async () => {
+      const refreshToken = sessionStorage.getItem('refreshToken');
+      if (!refreshToken) return;
+      try {
+        const accessToken = await refreshAccessToken(refreshToken);
+        const data = await getAllDeviceTypes(accessToken);
+        setDeviceTypes(data);
+      } catch (error) {
+        console.error('Error fetching device types:', error);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleEditClick = (id: number) => {
     router.push(`/admin/deviceTypes/${id}`);
   };
 
-  const handleAddDeviceTypeClick = () => {
+  const handleAddClick = () => {
     router.push('/admin/deviceTypes/addDeviceType');
   };
+
+  const handleDeleteClick = async (id: number) => {
+    const confirmDelete = confirm('Are you sure you want to delete this device type?');
+    if (!confirmDelete) return;
+
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken) return;
+
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      await deleteDeviceTypeById(id, accessToken);
+      setDeviceTypes((prev) => prev.filter((dt) => dt.id !== id));
+    } catch (error) {
+      console.error('Delete failed:', error);
+    }
+  };
+
+  const filtered = deviceTypes.filter((dt) =>
+    dt.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <AdminLayout>
@@ -32,9 +71,9 @@ const DeviceTypes = () => {
             placeholder="Enter device type name"
           />
         </div>
-        <button 
-          onClick={handleAddDeviceTypeClick}
-          className="px-4 py-2 bg-accent text-white rounded hover:bg-highlight focus:outline-none focus:ring-2 focus:ring-highlight"
+        <button
+          onClick={handleAddClick}
+          className="px-4 py-2 bg-accent text-white rounded hover:bg-highlight"
         >
           Add New Device Type
         </button>
@@ -49,18 +88,34 @@ const DeviceTypes = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredDeviceTypes.map((deviceType) => (
-              <tr key={deviceType.id}>
-                <td className="py-2 px-4 border-b font-medium text-center">{deviceType.name}</td>
-                <td className="py-2 px-4 border-b text-center">{deviceType.description}</td>
-                <td className="py-2 px-4 border-b text-center">
-                  <button className="px-2 py-1 bg-blue-500 text-white rounded mr-2 hover:bg-blue-700" onClick={() => handleEditClick(deviceType.id)}>
-                    Edit
-                  </button>
-                  <button className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-700">Delete</button>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="py-4 px-4 text-center text-gray-500">
+                  No device types found.
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map((dt) => (
+                <tr key={dt.id}>
+                  <td className="py-2 px-4 border-b text-center">{dt.name}</td>
+                  <td className="py-2 px-4 border-b text-center">{dt.description}</td>
+                  <td className="py-2 px-4 border-b text-center">
+                    <button
+                      onClick={() => handleEditClick(dt.id)}
+                      className="mr-2 px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-700"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(dt.id)}
+                      className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { networks, deviceTypes } from '@/data/placeholderData';
 import AdminLayout from '@/components/AdminLayout';
+import { createDevice } from '@/api/devices';
+import { refreshAccessToken } from '@/api/auth';
+import { getAllNetworks } from '@/api/networks';
+import { getAllDeviceTypes } from '@/api/deviceTypes';
+import { v4 as uuidv4 } from 'uuid';
 
 const AddDevice = () => {
   const [name, setName] = useState('');
@@ -9,15 +13,66 @@ const AddDevice = () => {
   const [deviceType, setDeviceType] = useState('');
   const [operation, setOperation] = useState('Operational');
   const [data, setData] = useState('');
+  const [networks, setNetworks] = useState<any[]>([]);
+  const [deviceTypes, setDeviceTypes] = useState<any[]>([]);
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchOptions = async () => {
+      const refreshToken = sessionStorage.getItem('refreshToken');
+      if (!refreshToken) return;
+
+      try {
+        const accessToken = await refreshAccessToken(refreshToken);
+        const [nets, devTypes] = await Promise.all([
+          getAllNetworks(accessToken),
+          getAllDeviceTypes(accessToken),
+        ]);
+        setNetworks(nets);
+        setDeviceTypes(devTypes);
+      } catch (err) {
+        console.error('Failed to load options', err);
+      }
+    };
+
+    fetchOptions();
+  }, []);
 
   const handleCancel = () => {
     router.push('/admin/devices');
   };
 
-  const handleSave = () => {
-    // Add functionality to save the new device
-    console.log('Device saved');
+  const handleSave = async () => {
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken) return;
+
+    let parsedData: object = {};
+    if (data.trim()) {
+      try {
+        parsedData = JSON.parse(data);
+      } catch (err) {
+        alert('Invalid JSON in Data field');
+        return;
+      }
+    }
+
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      const newId = uuidv4();
+      await createDevice(accessToken, newId, {
+        name,
+        data: parsedData,
+        networkId: Number(network),
+        deviceTypeId: Number(deviceType),
+        blocked: operation === 'Blocked',
+      });
+
+      // ✅ Redirect after successful creation
+      router.push('/admin/devices');
+    } catch (err: any) {
+      console.error('Failed to create device:', err);
+      alert(`Failed to create device: ${err.message}`);
+    }
   };
 
   return (
@@ -82,7 +137,7 @@ const AddDevice = () => {
               value={data}
               onChange={(e) => setData(e.target.value)}
               className="p-2 border border-gray-300 rounded w-full"
-              placeholder="Enter data (JSON format)"
+              placeholder='Enter data (JSON format), e.g. {"jsonString": "value"}'
             />
           </div>
         </div>

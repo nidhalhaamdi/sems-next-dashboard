@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
+import { refreshAccessToken } from '@/api/auth';
+import { sendCommandToDevice } from '@/api/commands';
 
 interface CommandPopupProps {
   isOpen: boolean;
   onClose: () => void;
+  onCommandSent?: () => void;
 }
 
-const CommandPopup: React.FC<CommandPopupProps> = ({ isOpen, onClose }) => {
+const CommandPopup: React.FC<CommandPopupProps> = ({ isOpen, onClose, onCommandSent }) => {
   const [name, setName] = useState('');
   const [parameters, setParameters] = useState('');
+  const router = useRouter();
+  const { id } = router.query;
 
   const handleOutsideClick = useCallback((e: MouseEvent) => {
     if ((e.target as HTMLElement).className.includes('popup-overlay')) {
@@ -31,10 +37,41 @@ const CommandPopup: React.FC<CommandPopupProps> = ({ isOpen, onClose }) => {
     onClose();
   };
 
-  const handleSave = () => {
-    // Add functionality to save the data
-    console.log('Command saved');
-    onClose();
+  const handleSave = async () => {
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken || typeof id !== 'string') {
+      alert('Device ID is missing!');
+      return;
+    }
+
+    let parsedParams = {};
+    if (parameters.trim()) {
+      try {
+        parsedParams = JSON.parse(parameters);
+      } catch {
+        alert('Invalid JSON format for parameters');
+        return;
+      }
+    }
+
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      const timestamp = new Date().toISOString();
+      await sendCommandToDevice(id, accessToken, {
+        command: name,
+        timestamp,
+        parameters: parsedParams,
+        lifetime: 0,
+        status: 'NEW',
+        result: {},
+      });
+
+      alert('Command sent!');
+      onClose();
+      onCommandSent?.();
+    } catch (err: any) {
+      alert(`Failed to send command: ${err.message}`);
+    }
   };
 
   if (!isOpen) return null;
@@ -50,7 +87,7 @@ const CommandPopup: React.FC<CommandPopupProps> = ({ isOpen, onClose }) => {
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="p-2 border border-gray-300 rounded w-full"
-            placeholder="Enter name"
+            placeholder="Enter command name"
           />
         </div>
         <div className="mb-4">
@@ -59,7 +96,7 @@ const CommandPopup: React.FC<CommandPopupProps> = ({ isOpen, onClose }) => {
             value={parameters}
             onChange={(e) => setParameters(e.target.value)}
             className="p-2 border border-gray-300 rounded w-full"
-            placeholder="Enter parameters"
+            placeholder='e.g., {"key": "value"}'
           />
         </div>
         <div className="flex justify-end">

@@ -1,18 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { devices, networks, deviceTypes } from '@/data/placeholderData';
 import AdminLayout from '@/components/AdminLayout';
+import { getAllNetworks } from '@/api/networks';
+import { getAllDeviceTypes } from '@/api/deviceTypes';
+import { updateDevice, getDeviceById } from '@/api/devices';
+import { refreshAccessToken } from '@/api/auth';
 
 const EditDevice = () => {
   const router = useRouter();
   const { id } = router.query;
-  const device = devices.find((d) => d.id === parseInt(id as string, 10));
+  const [name, setName] = useState('');
+  const [networkId, setNetworkId] = useState('');
+  const [deviceTypeId, setDeviceTypeId] = useState('');
+  const [operation, setOperation] = useState('Operational');
+  const [data, setData] = useState('');
+  const [networks, setNetworks] = useState([]);
+  const [deviceTypes, setDeviceTypes] = useState([]);
 
-  const [name, setName] = useState(device?.name || '');
-  const [network, setNetwork] = useState(device?.networkId || '');
-  const [deviceType, setDeviceType] = useState(device?.deviceTypeId || '');
-  const [operation, setOperation] = useState(device?.blocked || 'Operational');
-  const [data, setData] = useState(JSON.stringify(device?.data || ''));
+  useEffect(() => {
+  const fetchData = async () => {
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken) return;
+
+    try {
+      const token = await refreshAccessToken(refreshToken);
+      const [device, networksRes, deviceTypesRes] = await Promise.all([
+        getDeviceById(id as string, token),
+        getAllNetworks(token),
+        getAllDeviceTypes(token),
+      ]);
+      setName(device.name);
+      setNetworkId(device.networkId);
+      setDeviceTypeId(device.deviceTypeId);
+      setOperation(device.blocked ? 'Blocked' : 'Operational');
+      setData(device.data ? JSON.stringify(device.data) : '');
+      setNetworks(networksRes);
+      setDeviceTypes(deviceTypesRes);
+    } catch (err) {
+      console.error('Failed to fetch device:', err);
+    }
+  };
+  if (id) fetchData();
+}, [id]);
+
+
+  const handleSave = async () => {
+  const refreshToken = sessionStorage.getItem('refreshToken');
+  if (!refreshToken) return;
+
+  let parsedData: object = {};
+  if (data.trim()) {
+    try {
+      parsedData = JSON.parse(data);
+    } catch (err) {
+      alert('Invalid JSON in Data field');
+      return;
+    }
+  }
+
+  try {
+    const accessToken = await refreshAccessToken(refreshToken);
+    await updateDevice(id as string, accessToken, {
+      name,
+      data: parsedData,
+      networkId: parseInt(networkId),
+      deviceTypeId: parseInt(deviceTypeId),
+      blocked: operation === 'Blocked',
+    });
+    router.push('/admin/devices');
+  } catch (err: any) {
+    console.error('Failed to update device:', err);
+    alert(`Failed to update device: ${err.message}`);
+  }
+};
 
   return (
     <AdminLayout>
@@ -31,30 +91,26 @@ const EditDevice = () => {
           <div>
             <label className="block mb-1">Network</label>
             <select
-              value={network}
-              onChange={(e) => setNetwork(e.target.value)}
+              value={networkId}
+              onChange={(e) => setNetworkId(e.target.value)}
               className="p-2 border border-gray-300 rounded w-full"
             >
               <option value="">Select Network</option>
-              {networks.map((net) => (
-                <option key={net.id} value={net.id}>
-                  {net.name}
-                </option>
+              {networks.map((net: any) => (
+                <option key={net.id} value={net.id}>{net.name}</option>
               ))}
             </select>
           </div>
           <div>
             <label className="block mb-1">Device Type</label>
             <select
-              value={deviceType}
-              onChange={(e) => setDeviceType(e.target.value)}
+              value={deviceTypeId}
+              onChange={(e) => setDeviceTypeId(e.target.value)}
               className="p-2 border border-gray-300 rounded w-full"
             >
               <option value="">Select Device Type</option>
-              {deviceTypes.map((dt) => (
-                <option key={dt.id} value={dt.id}>
-                  {dt.name}
-                </option>
+              {deviceTypes.map((dt: any) => (
+                <option key={dt.id} value={dt.id}>{dt.name}</option>
               ))}
             </select>
           </div>
@@ -80,8 +136,14 @@ const EditDevice = () => {
           </div>
         </div>
         <div className="flex justify-end">
-          <button className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700 mr-2">Cancel</button>
-          <button className="px-4 py-2 bg-accent text-white rounded hover:bg-highlight">Save</button>
+          <button
+            onClick={() => router.push('/admin/devices')}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700 mr-2"
+          >Cancel</button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 bg-accent text-white rounded hover:bg-highlight"
+          >Save</button>
         </div>
       </div>
     </AdminLayout>

@@ -1,15 +1,45 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { deviceTypes } from '@/data/placeholderData';
 import AdminLayout from '@/components/AdminLayout';
+import { refreshAccessToken } from '@/api/auth';
+import { getDeviceTypeById, updateDeviceType } from '@/api/deviceTypes';
 
 const DeviceTypeDetails = () => {
   const router = useRouter();
   const { id } = router.query;
-  const deviceType = deviceTypes.find((dt) => dt.id === parseInt(id as string));
 
-  const [name, setName] = useState(deviceType?.name || '');
-  const [description, setDescription] = useState(deviceType?.description || '');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    const fetchDeviceType = async () => {
+      const refreshToken = sessionStorage.getItem('refreshToken');
+      if (!refreshToken || !id) return;
+      const accessToken = await refreshAccessToken(refreshToken);
+      const deviceType = await getDeviceTypeById(Number(id), accessToken);
+      setName(deviceType.name);
+      setDescription(deviceType.description);
+    };
+    fetchDeviceType();
+  }, [id]);
+
+  const handleCancel = () => {
+    router.push('/admin/deviceTypes');
+  };
+
+  const handleSave = async () => {
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken || !id) return;
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      await updateDeviceType(Number(id), accessToken, { name, description });
+      alert('Device type updated successfully!');
+      router.push('/admin/deviceTypes');
+    } catch (error) {
+      console.error('Update failed:', error);
+      alert('Failed to update device type');
+    }
+  };
 
   return (
     <AdminLayout>
@@ -36,8 +66,12 @@ const DeviceTypeDetails = () => {
           </div>
         </div>
         <div className="flex justify-end">
-          <button className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700 mr-2">Cancel</button>
-          <button className="px-4 py-2 bg-accent text-white rounded hover:bg-highlight">Save</button>
+          <button onClick={handleCancel} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700 mr-2">
+            Cancel
+          </button>
+          <button onClick={handleSave} className="px-4 py-2 bg-accent text-white rounded hover:bg-highlight">
+            Save
+          </button>
         </div>
       </div>
     </AdminLayout>

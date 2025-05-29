@@ -27,7 +27,9 @@ const Header = () => {
       <div className="flex items-center">
         <button
           onClick={() => {
-            localStorage.removeItem('token');
+            sessionStorage.removeItem('refreshToken');
+            // You can also remove accessToken if stored
+            // sessionStorage.removeItem('accessToken');
             window.location.href = '/login';
           }}
           className="px-4 py-2 bg-accent rounded-md hover:bg-highlight focus:outline-none focus:ring-2 focus:ring-highlight"

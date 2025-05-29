@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
+import { refreshAccessToken } from '@/api/auth';
+import { createDeviceType } from '@/api/deviceTypes';
 
 const AddDeviceType = () => {
   const [name, setName] = useState('');
@@ -11,9 +13,18 @@ const AddDeviceType = () => {
     router.push('/admin/deviceTypes');
   };
 
-  const handleSave = () => {
-    // Add functionality to save the new device type
-    console.log('Device Type saved');
+  const handleSave = async () => {
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken) return;
+
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      await createDeviceType(accessToken, { name, description });
+      router.push('/admin/deviceTypes');
+    } catch (error) {
+      console.error('Error creating device type:', error);
+      alert('Failed to create device type');
+    }
   };
 
   return (

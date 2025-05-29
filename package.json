@@ -17,7 +17,8 @@
     "react": "^19.1.0",
     "react-datepicker": "^7.6.0",
     "react-dom": "^19.1.0",
-    "sems-next-dashboard": "file:"
+    "sems-next-dashboard": "file:",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

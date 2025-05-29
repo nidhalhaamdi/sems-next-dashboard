@@ -1,13 +1,34 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { deviceCommands } from '@/data/placeholderData';
 import AdminLayout from '@/components/AdminLayout';
 import CommandPopup from '@/components/CommandPopup';
+import { refreshAccessToken } from '@/api/auth';
+import { getDeviceCommands } from '@/api/commands';
 
 const Commands = () => {
   const router = useRouter();
   const { id } = router.query;
+  const [commands, setCommands] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
+
+  const fetchCommands = async () => {
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken || !id) return;
+
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      const data = await getDeviceCommands(id as string, accessToken);
+      setCommands(data);
+    } catch (err) {
+      console.error('Failed to fetch commands:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (id) {
+      fetchCommands();
+    }
+  }, [id]);
 
   const handleSendCommand = () => {
     setShowPopup(true);
@@ -40,19 +61,33 @@ const Commands = () => {
               </tr>
             </thead>
             <tbody>
-              {deviceCommands.map((command) => (
-                <tr key={command.id}>
-                  <td className="py-2 px-4 border-b text-center">{command.command}</td>
-                  <td className="py-2 px-4 border-b text-center">{command.timestamp}</td>
-                  <td className="py-2 px-4 border-b text-center">{JSON.stringify(command.parameters)}</td>
-                  <td className="py-2 px-4 border-b text-center">{command.status}</td>
-                  <td className="py-2 px-4 border-b text-center">{JSON.stringify(command.result)}</td>
+              {commands.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-4 text-gray-500">
+                    No commands available.
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                commands.map((cmd: any) => (
+                  <tr key={cmd.id}>
+                    <td className="py-2 px-4 border-b text-center">{cmd.command}</td>
+                    <td className="py-2 px-4 border-b text-center">{new Date(cmd.timestamp).toLocaleString()}</td>
+                    <td className="py-2 px-4 border-b text-center">{JSON.stringify(cmd.parameters)}</td>
+                    <td className="py-2 px-4 border-b text-center">{cmd.status}</td>
+                    <td className="py-2 px-4 border-b text-center">{JSON.stringify(cmd.result)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-        {showPopup && <CommandPopup isOpen={showPopup} onClose={handleClosePopup} />}
+        {showPopup && (
+          <CommandPopup
+            isOpen={showPopup}
+            onClose={handleClosePopup}
+            onCommandSent={fetchCommands}
+          />
+        )}
       </div>
     </AdminLayout>
   );

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
+import { refreshAccessToken } from '@/api/auth';
+import { createUser } from '@/api/users';
 
 const AddUser = () => {
   const [login, setLogin] = useState('');
@@ -15,9 +17,43 @@ const AddUser = () => {
     router.push('/admin/users');
   };
 
-  const handleSave = () => {
-    // Add functionality to save the new user
-    console.log('User saved');
+  const handleSave = async () => {
+    if (!login || !password) {
+      alert('Login and password are required.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      alert('Passwords do not match.');
+      return;
+    }
+
+    const refreshToken = sessionStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      alert('No refresh token. Please log in again.');
+      return;
+    }
+
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+
+      const userPayload = {
+        login,
+        role: role === 'Admin' ? 0 : 1,
+        status: status === 'Active' ? 0 : status === 'Locked' ? 1 : 2,
+        password,
+        data: {
+          jsonString: data,
+        },
+        introReviewed: true,
+      };
+
+      await createUser(userPayload, accessToken);
+      router.push('/admin/users');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to create user.');
+    }
   };
 
   return (
